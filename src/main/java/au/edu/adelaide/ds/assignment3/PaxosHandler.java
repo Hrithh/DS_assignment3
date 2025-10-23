@@ -1,12 +1,11 @@
 package au.edu.adelaide.ds.assignment3;
 
 import com.google.gson.Gson;
-
 import java.io.BufferedWriter;
 import java.io.OutputStreamWriter;
 import java.net.Socket;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
+import java.util.Map;
 
 public class PaxosHandler {
     private final String memberId;
@@ -23,8 +22,8 @@ public class PaxosHandler {
     private final Map<String, Integer> acceptedCounts = new HashMap<>();
     private boolean consensusReached = false;
 
-    // For tracking majority
-    private int quorumSize;
+    // Majority tracking
+    private final int quorumSize;
 
     public PaxosHandler(String memberId, NetworkConfig config, Profile profile) {
         this.memberId = memberId;
@@ -41,71 +40,86 @@ public class PaxosHandler {
         }
 
         Message msg = gson.fromJson(rawJson, Message.class);
-        switch (msg.type) {
-            case "PREPARE":
+        Message.MessageType type = msg.getType();
+
+        switch (type) {
+            case PREPARE:
                 handlePrepare(msg);
                 break;
-            case "PROMISE":
+            case PROMISE:
                 handlePromise(msg);
                 break;
-            case "ACCEPT_REQUEST":
+            case ACCEPT_REQUEST:
                 handleAcceptRequest(msg);
                 break;
-            case "ACCEPTED":
+            case ACCEPTED:
                 handleAccepted(msg);
                 break;
             default:
-                System.out.printf("[%s] Received unknown message type: %s%n", memberId, msg.type);
+                System.out.printf("[%s] Unknown message type: %s%n", memberId, type);
         }
     }
 
     private void handlePrepare(Message msg) {
-        if (promisedN == null || compareProposal(msg.proposalNum, promisedN) > 0) {
-            promisedN = msg.proposalNum;
+        String proposalNum = msg.getProposalNumber();
+        String sender = msg.getSenderId();
 
-            Message promise = new Message("PROMISE", memberId, msg.proposalNum, acceptedValue);
-            promise.proposalNum = msg.proposalNum; // same proposalNum
+        if (promisedN == null || compareProposal(proposalNum, promisedN) > 0) {
+            promisedN = proposalNum;
 
-            if (acceptedN != null && acceptedValue != null) {
-                promise.value = acceptedValue;
-            }
+            Message promise = new Message();
+            promise.setType(Message.MessageType.PROMISE);
+            promise.setSenderId(memberId);
+            promise.setProposalNumber(proposalNum);
+            promise.setValue(acceptedValue);
 
-            sendTo(msg.sender, gson.toJson(promise));
-            log("[ACCEPTOR][PROMISE] to=" + msg.sender + " n=" + msg.proposalNum);
+            sendTo(sender, gson.toJson(promise));
+            log("[ACCEPTOR][PROMISE] to=" + sender + " n=" + proposalNum);
         } else {
-            log("[ACCEPTOR][IGNORE] n=" + msg.proposalNum + " < promisedN=" + promisedN);
+            log("[ACCEPTOR][IGNORE] n=" + proposalNum + " < promisedN=" + promisedN);
         }
     }
 
     private void handlePromise(Message msg) {
-        // TODO: For now, just print promise. We'll collect and act on it later.
-        log("[PROPOSER][PROMISE RECEIVED] from=" + msg.sender + " n=" + msg.proposalNum + " v=" + msg.value);
+        log("[PROPOSER][PROMISE RECEIVED] from=" + msg.getSenderId()
+                + " n=" + msg.getProposalNumber()
+                + " v=" + msg.getValue());
+        // TODO: Future step: collect promises, then send ACCEPT_REQUEST
     }
 
     private void handleAcceptRequest(Message msg) {
-        if (promisedN == null || compareProposal(msg.proposalNum, promisedN) >= 0) {
-            promisedN = msg.proposalNum;
-            acceptedN = msg.proposalNum;
-            acceptedValue = msg.value;
+        String proposalNum = msg.getProposalNumber();
+        String sender = msg.getSenderId();
+        String value = msg.getValue();
 
-            Message accepted = new Message("ACCEPTED", memberId, acceptedN, acceptedValue);
+        if (promisedN == null || compareProposal(proposalNum, promisedN) >= 0) {
+            promisedN = proposalNum;
+            acceptedN = proposalNum;
+            acceptedValue = value;
+
+            Message accepted = new Message();
+            accepted.setType(Message.MessageType.ACCEPTED);
+            accepted.setSenderId(memberId);
+            accepted.setProposalNumber(acceptedN);
+            accepted.setValue(acceptedValue);
+
             sendToAllExceptSelf(gson.toJson(accepted));
-
             log("[ACCEPTOR][ACCEPTED] value=" + acceptedValue + " n=" + acceptedN);
         } else {
-            log("[ACCEPTOR][REJECTED] n=" + msg.proposalNum + " < promisedN=" + promisedN);
+            log("[ACCEPTOR][REJECTED] n=" + proposalNum + " < promisedN=" + promisedN);
         }
     }
 
     private void handleAccepted(Message msg) {
         if (consensusReached) return;
 
-        String val = msg.value;
-        acceptedCounts.put(val, acceptedCounts.getOrDefault(val, 0) + 1);
+        String value = msg.getValue();
+        acceptedCounts.put(value, acceptedCounts.getOrDefault(value, 0) + 1);
 
-        if (acceptedCounts.get(val) >= quorumSize) {
+        if (acceptedCounts.get(value) >= quorumSize) {
             consensusReached = true;
-            System.out.printf("[%s][LEARNER][CONSENSUS] winner=%s proposal=%s%n", memberId, val, msg.proposalNum);
+            System.out.printf("[%s][LEARNER][CONSENSUS] value=%s proposal=%s%n",
+                    memberId, value, msg.getProposalNumber());
         }
     }
 
@@ -135,7 +149,6 @@ public class PaxosHandler {
         System.out.printf("[%s] %s%n", memberId, msg);
     }
 
-    // Compares "3.1" vs "2.5"
     private int compareProposal(String a, String b) {
         String[] aParts = a.split("\\.");
         String[] bParts = b.split("\\.");
@@ -143,6 +156,7 @@ public class PaxosHandler {
         int idA = Integer.parseInt(aParts[1]);
         int roundB = Integer.parseInt(bParts[0]);
         int idB = Integer.parseInt(bParts[1]);
+
         if (roundA != roundB) return Integer.compare(roundA, roundB);
         return Integer.compare(idA, idB);
     }

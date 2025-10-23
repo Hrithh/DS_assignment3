@@ -14,11 +14,11 @@ public class PaxosNode {
     private final ExecutorService executor;
     private final PaxosHandler handler;
 
-    public PaxosNode(String nodeId, int port) {
+    public PaxosNode(String nodeId, int port, NetworkConfig config, Profile profile) {
         this.port = port;
         this.nodeId = nodeId;
         this.executor = Executors.newCachedThreadPool();
-        this.handler = new PaxosHandler(nodeId);
+        this.handler = new PaxosHandler(nodeId, config, profile);
     }
 
     public void start() {
@@ -70,15 +70,32 @@ public class PaxosNode {
     }
 
     public static void main(String[] args) {
-        if (args.length < 2) {
-            System.out.println("Usage: java PaxosNode <nodeId> <port>");
+        if (args.length < 3) {
+            System.out.println("Usage: java PaxosNode <nodeId> <port> --profile=<reliable|standard|latent|failure>");
             return;
         }
 
-        String nodeId = args[0];
-        int port = Integer.parseInt(args[1]);
+        try {
+            String nodeId = args[0];
+            int port = Integer.parseInt(args[1]);
 
-        PaxosNode node = new PaxosNode(nodeId, port);
-        node.start();
+            // Extract profile from --profile=VALUE
+            String profileArg = args[2];
+            if (!profileArg.startsWith("--profile=")) {
+                throw new IllegalArgumentException("Missing --profile argument");
+            }
+            String profileStr = profileArg.substring("--profile=".length());
+            Profile profile = Profile.fromString(profileStr);
+
+            // Load network config
+            NetworkConfig config = NetworkConfig.load();
+
+            // Start the node
+            PaxosNode node = new PaxosNode(nodeId, port, config, profile);
+            node.start();
+
+        } catch (Exception e) {
+            System.err.println("[ERROR] Failed to start PaxosNode: " + e.getMessage());
+        }
     }
 }

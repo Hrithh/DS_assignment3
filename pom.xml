@@ -36,6 +36,16 @@
                     <target>11</target>
                 </configuration>
             </plugin>
+
+            <!-- Exec plugin for running PaxosNode -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>au.edu.adelaide.ds.assignment3.PaxosNode</mainClass>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 

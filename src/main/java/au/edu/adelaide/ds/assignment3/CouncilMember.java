@@ -21,7 +21,7 @@ public class CouncilMember {
         profile = Profile.fromString(profileArg);
 
         try {
-            config = NetworkConfig.load("src/main/resources/network.config");
+            config = NetworkConfig.load();
             port = config.getPort(memberId);
 
             System.out.printf("[%s] Starting on port %d with profile: %s%n", memberId, port, profileArg);
