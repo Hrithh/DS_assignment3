@@ -1,6 +1,6 @@
-# Weather Aggregation System – DS Assignment 2
+# Paxos-Based Council Election System – DS Assignment 3
 
-This project implements a **Distributed Weather Aggregation System** using Java. It simulates a set of weather **Content Servers (replicas)** that send weather data to a central **Aggregation Server**, which serves **Clients** via `GET` requests. The system supports **Lamport Clocks**, **fault tolerance**, and **record expiry** logic.
+This project implements a Paxos-based distributed consensus system using Java. The system simulates a network of Council Members (nodes) that communicate using the Paxos algorithm to elect a Council President. Each node may behave under different reliability profiles (e.g., reliable, failure-prone, latent).
 
 ---
 
@@ -8,6 +8,7 @@ This project implements a **Distributed Weather Aggregation System** using Java.
 
 - **Java 11.0.28 (LTS)**
 - **Maven 3.9.9**
+- Git Bash (for Windows users) — required to execute run_tests.sh
 - vendor: Eclipse Adoptium
 
 ---
@@ -18,190 +19,59 @@ This project implements a **Distributed Weather Aggregation System** using Java.
 - gson (Google JSON)
 - Java standard libraries (no external REST frameworks used)
 
-## How to Run the System
+## How to Run the System (Manual)
 
-Make sure you're inside the `DS_AT2` project root.
+Make sure you're inside the `DS_AT3` project root.
 
-### 1. **Start the Aggregation Server**
+### 1. **Compile**
 
-`mvn exec:java "-Dexec.mainClass=au.edu.adelaide.ds.assignment2.AggregationServer"`  
-`make server`
+`mvn clean compile`
 
-### 2. **Start a Content Server (Replica)**
+### 2. **Start Council Members**
 
-You can run multiple replicas using different IDs and input files:  
-`mvn exec:java "-Dexec.mainClass=au.edu.adelaide.ds.assignment2.ContentServer" "-Dexec.args=localhost:4567 weather1.txt replica1"`
+Open separate terminals for each member  
+`-Dexec.mainClass=au.edu.adelaide.ds.assignment3.CouncilMember -Dexec.args="M1 --profile reliable"`
+`-Dexec.mainClass=au.edu.adelaide.ds.assignment3.CouncilMember -Dexec.args="M2 --profile standard"`
+`-Dexec.mainClass=au.edu.adelaide.ds.assignment3.CouncilMember -Dexec.args="M3 --profile failure"`
 
-first replica:  
-`make content1`
+You can use any combination of member IDs and profiles:
+- reliable
+- standard
+- latent
+- failure
 
-second replica:  
-`make content2`
+### 3. **Trigger a Proposal(Manual)**
 
-Each Content Server:
-- Reads local weather data from a file
-- Embeds a Lamport timestamp
-- Sends data via a PUT request to the Aggregation Server
-
-### 3. **Start the Client**
-
-`mvn exec:java "-Dexec.mainClass=au.edu.adelaide.ds.assignment2.GETClient" "-Dexec.args=localhost:4567"`  
-`make client`
+`mvn exec:java -Dexec.mainClass=au.edu.adelaide.ds.assignment3.ProposerClient -Dexec.args="M1 network.config"`
 
 ---
 
-## Test Procedure
+## How to Run the System (Automated)
+A Bash script (run_tests.sh) is provided to automatically launch all 9 Council Members, trigger proposals, simulate failures, and capture logs for each scenario.  
+You must use Git Bash or WSL to run the script.
 
-<details>
-  <summary><strong>1. 201 Created / 200 OK</strong></summary>
+### 1. **Compile**
 
-**Terminal 1**
-- `make build`
-- `make server`
+`mvn clean compile`
 
-**Terminal 2**
-- `make content1`
+### 2. **Execute Script**
 
-**Terminal 3**
-- `make client`
+`./run_test.sh`
 
-First PUT → server responds **201 Created**  
-Subsequent PUTs (same station) → server responds **200 OK**
+You can choose option below:
+- `./run_test.sh 1`
+  (Ideal network (all reliable)
+- `./run_test.sh 2`
+  (Concurrent proposals (M1 vs M8))
+- `./run_test.sh 3a`
+  (Fault tolerance mix; M4 proposes)
+- `./run_test.sh 3b`
+  (Fault tolerance mix; M2 (latent) proposes)
+- `./run_test.sh 3c`
+  (Fault tolerance mix; M3 proposes then crashes)
+- `./run_test.sh all`
+  (All the test above)
 
-</details>
+### 3. **Clean logs**
 
----
-
-<details>
-  <summary><strong>2. 204 No Content (30s expiry)</strong></summary>
-
-**Terminal 1**
-- `make build`
-- `make server`
-
-**Terminal 2**
-- `make content1`
-- After few updates, `ctrl+c`
-
-Wait 30s (expiry timeout)
-
-**Terminal 3**
-- `make client`
-
-Server responds **204 No Content**
-
-</details>
-
----
-
-<details>
-  <summary><strong>3. 400 Bad Request</strong></summary>
-
-**Terminal 1**
-- `make build`
-- `make server`
-
-Edit `weather1.txt` to contain:
-{"badField": "oops"}
-
-**Terminal 2**
-- make content1
-</details>
-
----
-
-<details>
-  <summary><strong>4. 500 Internal Server Error</strong></summary>
-
-Uncomment line 153 AggregationServer.java
-
-**Terminal 1**
-- `make build`
-- `make server`
-
-</details>
-
----
-
-<details>
-  <summary><strong>5. Persistence Test</strong></summary>
-
-**Terminal 1**
-- `make build`
-- `make server`
-
-**Terminal 2**
-- `make content`
-
-**Terminal 1**
-- `stop server, ctrl+c`
-- `make server(restart`
-
-</details>
-
----
-
-<details>
-  <summary><strong>Multiple Content Servers (Replication / Fault Tolerance)</strong></summary>
-
-- `Start two ContentServers (replica1 and replica2) with different input files.`
-- `Confirm that GETClient shows both stations.`
-- `Kill one replica → wait 30s → confirm expired records disappear while the other replica’s remain.`
-- `This shows your system handles multiple sources and expiry correctly.`
-
-</details>
-
----
-
-<details>
-  <summary><strong>Lamport Clock Ordering</strong></summary>
-
-- `Start content1 and content2 simultaneously.`
-- `Confirm that GETClient shows records sorted by Lamport timestamp, not by arrival order.`
-- `Useful to prove logical time ordering works across replicas.`
-
-</details>
-
----
-
-<details>
-  <summary><strong>Invalid File / Missing ID (Content Server)</strong></summary>
-
-- `Modify weather1.txt to remove the id: line.`
-- `ContentServer should refuse to send or AggregationServer should reject with 400 Bad Request.`
-- `This checks validation of the input feed.`
-
-</details>
-
----
-
-<details>
-  <summary><strong>Crash Recovery (Persistence)</strong></summary>
-
-- `Start content1 → let it send data → stop AggregationServer.`
-- `Restart AggregationServer.`
-- `Confirm weather_data.json restores into memory and GETClient can still fetch old records.`
-
-</details>
-
----
-
-<details>
-  <summary><strong>Expiry Without Restart</strong></summary>
-
-- `Run content1 → stop it after one update.`
-- `Wait 30s.`
-- `Run GETClient.`
-- `Confirm expired data is gone and GETClient shows 204 No Content if no replicas are alive.`
-
-</details>
-
----
-
-<details>
-  <summary><strong>Edge Case: Empty File</strong></summary>
-
-- `Provide a weather.txt file with only whitespace.`
-- `ContentServer should fail gracefully or AggregationServer should return 204 No Content.`
-
-</details>
+`./run_test.sh clean`
