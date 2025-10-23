@@ -208,16 +208,8 @@ public class PaxosHandler {
     // -----------------------------
     private void sendTo(String targetMember, String messageJson) {
         try {
+            String host = config.getHost(targetMember);
             int port = config.getPort(targetMember);
-            // If you have getHost(...), use it; otherwise keep "localhost"
-            String host;
-            try {
-                host = (String) NetworkConfig.class
-                        .getMethod("getHost", String.class)
-                        .invoke(config, targetMember);
-            } catch (ReflectiveOperationException noHostMethod) {
-                host = "localhost";
-            }
 
             Socket socket = new Socket(host, port);
             BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
