@@ -30,9 +30,9 @@ Make sure you're inside the `DS_AT3` project root.
 ### 2. **Start Council Members**
 
 Open separate terminals for each member  
-`-Dexec.mainClass=au.edu.adelaide.ds.assignment3.CouncilMember -Dexec.args="M1 --profile reliable"`
-`-Dexec.mainClass=au.edu.adelaide.ds.assignment3.CouncilMember -Dexec.args="M2 --profile standard"`
-`-Dexec.mainClass=au.edu.adelaide.ds.assignment3.CouncilMember -Dexec.args="M3 --profile failure"`
+`-Dexec.mainClass=au.edu.adelaide.ds.assignment3.CouncilMember -Dexec.args="M1 --profile reliable"`  
+`-Dexec.mainClass=au.edu.adelaide.ds.assignment3.CouncilMember -Dexec.args="M2 --profile standard"`  
+`-Dexec.mainClass=au.edu.adelaide.ds.assignment3.CouncilMember -Dexec.args="M3 --profile failure"`  
 
 You can use any combination of member IDs and profiles:
 - reliable
