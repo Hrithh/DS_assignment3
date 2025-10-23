@@ -41,12 +41,21 @@ public class PaxosHandler {
     }
 
     // -----------------------------
+    // Local logging with timestamp
+    // -----------------------------
+    private void log(String fmt, Object... args) {
+        long t = System.currentTimeMillis() - CouncilMember.T0;
+        String prefix = String.format("[%s][%dms] ", memberId, t);
+        System.out.printf(prefix + fmt + "%n", args);
+    }
+
+    // -----------------------------
     // Message handling entry point
     // -----------------------------
     public void handleMessage(String rawJson) {
         profile.simulateNetworkDelay();
         if (profile.shouldDrop()) {
-            System.out.printf("[%s] (DROP) Ignoring message due to failure profile%n", memberId);
+            log("(DROP) Ignoring message due to failure profile");
             return;
         }
 
@@ -67,7 +76,7 @@ public class PaxosHandler {
                 handleAccepted(msg);
                 break;
             default:
-                System.out.printf("[%s] Unknown message type: %s%n", memberId, type);
+                log("Unknown message type: %s", type);
         }
     }
 
@@ -99,7 +108,7 @@ public class PaxosHandler {
         m.setSenderId(memberId);
         m.setProposalNumber(currentProposalN);
         sendToAllExceptSelf(gson.toJson(m));
-        log("[PROPOSER][PREPARE] n=" + currentProposalN + " v=" + myProposedValue);
+        log("[PROPOSER][PREPARE] n=%s v=%s", currentProposalN, myProposedValue);
 
         // timeout & re-propose with higher n if no quorum in time
         new Thread(() -> {
@@ -107,7 +116,6 @@ public class PaxosHandler {
             synchronized (PaxosHandler.this) {
                 if (!consensusReached && currentProposalN != null && promises < quorumSize) {
                     log("[PROPOSER] Timeout waiting for quorum; re-proposing with higher n");
-                    // Re-use the same value; increment round automatically
                     propose(this.myProposedValue);
                 }
             }
@@ -116,7 +124,7 @@ public class PaxosHandler {
 
     private synchronized void handlePromise(Message msg) {
         if (currentProposalN == null || !currentProposalN.equals(msg.getProposalNumber())) {
-            log("[PROPOSER][PROMISE] ignoring: for different proposal n=" + msg.getProposalNumber());
+            log("[PROPOSER][PROMISE] ignoring: for different proposal n=%s", msg.getProposalNumber());
             return;
         }
         promises++;
@@ -130,8 +138,8 @@ public class PaxosHandler {
             }
         }
 
-        log("[PROPOSER][PROMISE RECEIVED] from=" + msg.getSenderId() +
-                " count=" + promises + "/" + quorumSize +
+        log("[PROPOSER][PROMISE RECEIVED] from=%s count=%d/%d%s",
+                msg.getSenderId(), promises, quorumSize,
                 (prevN != null ? (" prev=(" + prevN + "," + prevV + ")") : ""));
 
         if (promises >= quorumSize) {
@@ -146,7 +154,7 @@ public class PaxosHandler {
             acc.setValue(valueToPropose);
 
             sendToAllExceptSelf(gson.toJson(acc));
-            log("[PROPOSER][ACCEPT_REQUEST] n=" + currentProposalN + " v=" + valueToPropose);
+            log("[PROPOSER][ACCEPT_REQUEST] n=%s v=%s", currentProposalN, valueToPropose);
         }
     }
 
@@ -168,10 +176,10 @@ public class PaxosHandler {
             promise.setPrevAcceptedN(acceptedN);
 
             sendTo(sender, gson.toJson(promise));
-            log("[ACCEPTOR][PROMISE] to=" + sender + " n=" + proposalNum +
+            log("[ACCEPTOR][PROMISE] to=%s n=%s%s", sender, proposalNum,
                     (acceptedN != null ? (" prev=(" + acceptedN + "," + acceptedValue + ")") : ""));
         } else {
-            log("[ACCEPTOR][IGNORE] n=" + proposalNum + " < promisedN=" + promisedN);
+            log("[ACCEPTOR][IGNORE] n=%s < promisedN=%s", proposalNum, promisedN);
         }
     }
 
@@ -191,9 +199,9 @@ public class PaxosHandler {
             accepted.setValue(acceptedValue);
 
             sendToAllExceptSelf(gson.toJson(accepted));
-            log("[ACCEPTOR][ACCEPTED] value=" + acceptedValue + " n=" + acceptedN);
+            log("[ACCEPTOR][ACCEPTED] value=%s n=%s", acceptedValue, acceptedN);
         } else {
-            log("[ACCEPTOR][REJECTED] n=" + proposalNum + " < promisedN=" + promisedN);
+            log("[ACCEPTOR][REJECTED] n=%s < promisedN=%s", proposalNum, promisedN);
         }
     }
 
@@ -208,10 +216,8 @@ public class PaxosHandler {
 
         if (acceptedCounts.get(value) >= quorumSize) {
             consensusReached = true;
-            // Assignment-style output plus detailed line
-            System.out.printf("CONSENSUS: %s has been elected Council President.%n", value);
-            System.out.printf("[%s][LEARNER][CONSENSUS] value=%s proposal=%s%n",
-                    memberId, value, msg.getProposalNumber());
+            log("CONSENSUS: %s has been elected Council President.", value);
+            log("[LEARNER][CONSENSUS] value=%s proposal=%s", value, msg.getProposalNumber());
         }
     }
 
@@ -247,10 +253,6 @@ public class PaxosHandler {
                 sendTo(target, messageJson);
             }
         }
-    }
-
-    private void log(String msg) {
-        System.out.printf("[%s] %s%n", memberId, msg);
     }
 
     private int compareProposal(String a, String b) {

@@ -1,14 +1,16 @@
-[M3] Starting on port 9003 with profile: failure
-[M3] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
-[M3] [ACCEPTOR][PROMISE] to=M1 n=1.1
-[M3] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
-[M3] (DROP) Ignoring message due to failure profile
-[M3] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
-CONSENSUS: LEADER_M1 has been elected Council President.
-[M3][LEARNER][CONSENSUS] value=LEADER_M1 proposal=1.1
-[M3] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
-[M3] (DROP) Ignoring message due to failure profile
-[M3] (DROP) Ignoring message due to failure profile
-[M3] (DROP) Ignoring message due to failure profile
-[M3] (DROP) Ignoring message due to failure profile
-[M3] (DROP) Ignoring message due to failure profile
+[M3][9ms] Starting on port 9003 with profile: failure
+[M3][91ms] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
+[M3][2361ms] [ACCEPTOR][PROMISE] to=M2 n=1.2
+[M3][3220ms] (DROP) Ignoring message due to failure profile
+[M3][3415ms] (DROP) Ignoring message due to failure profile
+[M3][3428ms] (DROP) Ignoring message due to failure profile
+[M3][3444ms] CONSENSUS: LEADER_M2 has been elected Council President.
+[M3][3444ms] [LEARNER][CONSENSUS] value=LEADER_M2 proposal=1.2
+[M3][3577ms] [ACCEPTOR][ACCEPTED] value=LEADER_M2 n=1.2
+[M3][3651ms] (DROP) Ignoring message due to failure profile
+[M3][3658ms] [ACCEPTOR][ACCEPTED] value=LEADER_M2 n=1.2
+[M3][3748ms] (DROP) Ignoring message due to failure profile
+[M3][3778ms] (DROP) Ignoring message due to failure profile
+[M3][3809ms] [ACCEPTOR][ACCEPTED] value=LEADER_M2 n=1.2
+[M3][3847ms] (DROP) Ignoring message due to failure profile
+[M3][3929ms] (DROP) Ignoring message due to failure profile

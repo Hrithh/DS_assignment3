@@ -1,9 +1,18 @@
-[M8] Starting on port 9008 with profile: reliable
-[M8] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
-[M8] [ACCEPTOR][PROMISE] to=M1 n=1.1
-[M8] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
-CONSENSUS: LEADER_M1 has been elected Council President.
-[M8][LEARNER][CONSENSUS] value=LEADER_M1 proposal=1.1
-[M8] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
-[M8] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
-[M8] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
+[M8][4ms] Starting on port 9008 with profile: reliable
+[M8][91ms] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
+[M8][2096ms] Triggering scheduled proposal after 2000 ms: LEADER_M8
+[M8][2117ms] [PROPOSER][PREPARE] n=1.8 v=LEADER_M8
+[M8][2147ms] [PROPOSER][PROMISE RECEIVED] from=M2 count=1/5
+[M8][2147ms] [PROPOSER][PROMISE RECEIVED] from=M4 count=2/5
+[M8][2147ms] [PROPOSER][PROMISE RECEIVED] from=M9 count=3/5
+[M8][2147ms] [PROPOSER][PROMISE RECEIVED] from=M5 count=4/5
+[M8][2148ms] [PROPOSER][PROMISE RECEIVED] from=M1 count=5/5
+[M8][2152ms] [PROPOSER][ACCEPT_REQUEST] n=1.8 v=LEADER_M8
+[M8][2153ms] [PROPOSER][PROMISE RECEIVED] from=M7 count=6/5
+[M8][2158ms] [PROPOSER][ACCEPT_REQUEST] n=1.8 v=LEADER_M8
+[M8][2158ms] [PROPOSER][PROMISE RECEIVED] from=M3 count=7/5
+[M8][2163ms] [PROPOSER][ACCEPT_REQUEST] n=1.8 v=LEADER_M8
+[M8][2163ms] [PROPOSER][PROMISE RECEIVED] from=M6 count=8/5
+[M8][2179ms] [PROPOSER][ACCEPT_REQUEST] n=1.8 v=LEADER_M8
+[M8][2180ms] CONSENSUS: LEADER_M8 has been elected Council President.
+[M8][2180ms] [LEARNER][CONSENSUS] value=LEADER_M8 proposal=1.8

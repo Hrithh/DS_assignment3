@@ -5,6 +5,16 @@ import java.net.*;
 import java.util.*;
 
 public class CouncilMember {
+
+    // --- Timing helper (for timestamped logs) ---
+    static final long T0 = System.currentTimeMillis();
+
+    public static void log(String fmt, Object... args) {
+        long t = System.currentTimeMillis() - T0;
+        String prefix = String.format("[%s][%dms] ", memberId, t);
+        System.out.printf(prefix + fmt + "%n", args);
+    }
+
     public static String memberId;
     public static Profile profile;
     public static int port;
@@ -21,11 +31,16 @@ public class CouncilMember {
         memberId = args[0].trim();
         String profileArg = args[1].substring("--profile=".length()).trim();
 
-        // Optional: --propose=VALUE
-        String proposeArg = null;
+        String proposeArg = null;           // e.g., --propose=LEADER_M5
+        Long triggerAfterMs = null;         // e.g., --trigger-after=3000
+
         for (String a : args) {
             if (a != null && a.startsWith("--propose=")) {
                 proposeArg = a.substring("--propose=".length()).trim();
+            } else if (a != null && a.startsWith("--trigger-after=")) {
+                try {
+                    triggerAfterMs = Long.parseLong(a.substring("--trigger-after=".length()).trim());
+                } catch (NumberFormatException ignore) { /* leave null */ }
             }
         }
 
@@ -34,30 +49,25 @@ public class CouncilMember {
         try {
             config = NetworkConfig.load();
             port = config.getPort(memberId);
-            System.out.printf("[%s] Starting on port %d with profile: %s%n", memberId, port, profileArg);
+            log("Starting on port %d with profile: %s", port, profileArg);
 
             ServerSocket serverSocket = new ServerSocket(port);
             PaxosHandler paxos = new PaxosHandler(memberId, config, profile);
 
-            // Fire a proposal if requested; otherwise default M1 proposes its own ID as leader.
-            if (proposeArg != null && !proposeArg.isEmpty()) {
+            // Schedule a proposal AFTER startup (no second process, satisfies "launch then trigger")
+            if (proposeArg != null && triggerAfterMs != null && triggerAfterMs >= 0) {
                 final String v = proposeArg;
+                final long delay = triggerAfterMs;
                 new Thread(() -> {
-                    try { Thread.sleep(1200); } catch (InterruptedException ignored) {}
-                    System.out.printf("[%s] Scheduling proposal via CLI: %s%n", memberId, v);
+                    try { Thread.sleep(delay); } catch (InterruptedException ignored) {}
+                    log("Triggering scheduled proposal after %d ms: %s", delay, v);
                     paxos.propose(v);
-                }).start();
-            } else if ("M1".equals(memberId)) {
-                new Thread(() -> {
-                    try { Thread.sleep(1200); } catch (InterruptedException ignored) {}
-                    paxos.propose("LEADER_" + memberId);
-                }).start();
+                }, "scheduled-proposer").start();
             }
 
-            // Allow typing values in the console to start proposals dynamically
+            // Keep your interactive stdin thread if you want, that’s fine:
             startInteractiveProposer(paxos);
 
-            // Main loop to accept incoming socket connections
             while (true) {
                 Socket socket = serverSocket.accept();
                 new Thread(() -> {
@@ -71,7 +81,6 @@ public class CouncilMember {
                     }
                 }).start();
             }
-
         } catch (Exception e) {
             System.err.println("Startup error: " + e.getMessage());
             e.printStackTrace();
@@ -84,17 +93,17 @@ public class CouncilMember {
     private static void startInteractiveProposer(PaxosHandler paxos) {
         Thread t = new Thread(() -> {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
-                System.out.printf("[%s] Type a value to propose (ex: LEADER_M5). Commands: /help, /q%n", memberId);
+                log("Type a value to propose (ex: LEADER_M5). Commands: /help, /q");
                 String line;
                 while ((line = br.readLine()) != null) {
                     String v = line.trim();
                     if (v.isEmpty()) continue;
                     if (v.equalsIgnoreCase("/help")) {
-                        System.out.println("Enter a value to propose (e.g., LEADER_M3). Commands: /q to stop input on this node.");
+                        log("Enter a value to propose (e.g., LEADER_M3). Commands: /q to stop input on this node.");
                         continue;
                     }
                     if (v.equalsIgnoreCase("/q") || v.equalsIgnoreCase("exit")) {
-                        System.out.println("Stopping interactive proposer input for this node.");
+                        log("Stopping interactive proposer input for this node.");
                         break;
                     }
                     paxos.propose(v);

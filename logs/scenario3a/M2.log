@@ -1,9 +1,8 @@
-[M2] Starting on port 9002 with profile: latent
-[M2] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
-[M2] [ACCEPTOR][PROMISE] to=M1 n=1.1
-CONSENSUS: LEADER_M1 has been elected Council President.
-[M2][LEARNER][CONSENSUS] value=LEADER_M1 proposal=1.1
-[M2] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
-[M2] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
-[M2] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
-[M2] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
+[M2][3ms] Starting on port 9002 with profile: latent
+[M2][43ms] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
+[M2][2059ms] [ACCEPTOR][PROMISE] to=M4 n=1.4
+[M2][2376ms] [ACCEPTOR][ACCEPTED] value=LEADER_M5 n=1.4
+[M2][2546ms] [ACCEPTOR][ACCEPTED] value=LEADER_M5 n=1.4
+[M2][2651ms] CONSENSUS: LEADER_M5 has been elected Council President.
+[M2][2651ms] [LEARNER][CONSENSUS] value=LEADER_M5 proposal=1.4
+[M2][2872ms] [ACCEPTOR][ACCEPTED] value=LEADER_M5 n=1.4
