@@ -1,0 +1,18 @@
+[M3][3ms] Starting on port 9003 with profile: failure
+[M3][50ms] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
+[M3][1052ms] Triggering scheduled proposal after 1000 ms: LEADER_M3
+[M3][1070ms] [PROPOSER][PREPARE] n=1.3 v=LEADER_M3
+[M3][1192ms] [PROPOSER][PROMISE RECEIVED] from=M1 count=1/5
+[M3][1296ms] [PROPOSER][PROMISE RECEIVED] from=M7 count=2/5
+[M3][1302ms] [PROPOSER][PROMISE RECEIVED] from=M4 count=3/5
+[M3][1321ms] [PROPOSER][PROMISE RECEIVED] from=M8 count=4/5
+[M3][1327ms] [PROPOSER][PROMISE RECEIVED] from=M9 count=5/5
+[M3][1329ms] [PROPOSER][ACCEPT_REQUEST] n=1.3 v=LEADER_M3
+[M3][1467ms] (DROP) Ignoring message due to failure profile
+[M3][1505ms] [PROPOSER][PROMISE RECEIVED] from=M6 count=6/5
+[M3][1508ms] [PROPOSER][ACCEPT_REQUEST] n=1.3 v=LEADER_M3
+[M3][1543ms] (DROP) Ignoring message due to failure profile
+[M3][1624ms] (DROP) Ignoring message due to failure profile
+[M3][1660ms] (DROP) Ignoring message due to failure profile
+[M3][1701ms] CONSENSUS: LEADER_M3 has been elected Council President.
+[M3][1701ms] [LEARNER][CONSENSUS] value=LEADER_M3 proposal=1.3

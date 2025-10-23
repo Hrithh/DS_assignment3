@@ -1,0 +1,9 @@
+[M2][3ms] Starting on port 9002 with profile: reliable
+[M2][43ms] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
+[M2][1564ms] [ACCEPTOR][PROMISE] to=M1 n=1.1
+[M2][1577ms] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
+[M2][1581ms] CONSENSUS: LEADER_M1 has been elected Council President.
+[M2][1583ms] [LEARNER][CONSENSUS] value=LEADER_M1 proposal=1.1
+[M2][1588ms] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
+[M2][1601ms] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1
+[M2][1610ms] [ACCEPTOR][ACCEPTED] value=LEADER_M1 n=1.1

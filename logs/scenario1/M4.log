@@ -1,0 +1,18 @@
+[M4][3ms] Starting on port 9004 with profile: reliable
+[M4][60ms] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
+[M4][3061ms] Triggering scheduled proposal after 3000 ms: LEADER_M5
+[M4][3080ms] [PROPOSER][PREPARE] n=1.4 v=LEADER_M5
+[M4][3111ms] [PROPOSER][PROMISE RECEIVED] from=M1 count=1/5
+[M4][3112ms] [PROPOSER][PROMISE RECEIVED] from=M3 count=2/5
+[M4][3112ms] [PROPOSER][PROMISE RECEIVED] from=M5 count=3/5
+[M4][3112ms] [PROPOSER][PROMISE RECEIVED] from=M7 count=4/5
+[M4][3112ms] [PROPOSER][PROMISE RECEIVED] from=M6 count=5/5
+[M4][3115ms] [PROPOSER][ACCEPT_REQUEST] n=1.4 v=LEADER_M5
+[M4][3116ms] [PROPOSER][PROMISE RECEIVED] from=M9 count=6/5
+[M4][3122ms] [PROPOSER][ACCEPT_REQUEST] n=1.4 v=LEADER_M5
+[M4][3122ms] [PROPOSER][PROMISE RECEIVED] from=M8 count=7/5
+[M4][3157ms] [PROPOSER][ACCEPT_REQUEST] n=1.4 v=LEADER_M5
+[M4][3158ms] [PROPOSER][PROMISE RECEIVED] from=M2 count=8/5
+[M4][3162ms] [PROPOSER][ACCEPT_REQUEST] n=1.4 v=LEADER_M5
+[M4][3163ms] CONSENSUS: LEADER_M5 has been elected Council President.
+[M4][3164ms] [LEARNER][CONSENSUS] value=LEADER_M5 proposal=1.4
