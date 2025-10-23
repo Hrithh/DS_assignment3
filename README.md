@@ -74,4 +74,15 @@ You can choose option below:
 
 ### 3. **Clean logs**
 
-`./run_test.sh clean`
+`./run_test.sh clean`  
+
+---
+
+## Message Design
+We use a Gson-based JSON message format (Message.java) to structure all Paxos messages. Each message includes the following fields:
+
+- **type**: Enum to indicate the message type (PREPARE, PROMISE, ACCEPT_REQUEST, ACCEPTED, DECIDE)  
+- **proposalNumber**: A string representing the proposal number in round.nodeId format (e.g. 1.0, 2.3)  
+- **senderId**: The node sending the message  
+- **value**: The value being proposed for consensus      
+- **prevAcceptedN**: The previously accepted proposal number (used in PROMISE messages)  
