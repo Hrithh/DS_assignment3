@@ -14,6 +14,7 @@ public class Message {
     private String proposalNumber;
     private String senderId;
     private String value;
+    private String prevAcceptedN;
 
     public MessageType getType() {
         return type;
@@ -45,5 +46,13 @@ public class Message {
 
     public void setValue(String value) {
         this.value = value;
+    }
+
+    public String getPrevAcceptedN() {
+        return prevAcceptedN;
+    }
+
+    public void setPrevAcceptedN(String prevAcceptedN) {
+        this.prevAcceptedN = prevAcceptedN;
     }
 }

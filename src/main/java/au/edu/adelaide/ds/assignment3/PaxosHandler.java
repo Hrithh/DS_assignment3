@@ -25,6 +25,14 @@ public class PaxosHandler {
     // Majority tracking
     private final int quorumSize;
 
+    // Proposer state
+    private String currentProposalN = null;
+    private String myProposedValue = null;
+    private int promises = 0;
+    private String highestAcceptedNSeen = null;
+    private String valueSuggestedByAcceptors = null;
+    private int localRound = 0;
+
     public PaxosHandler(String memberId, NetworkConfig config, Profile profile) {
         this.memberId = memberId;
         this.config = config;
@@ -32,6 +40,9 @@ public class PaxosHandler {
         this.quorumSize = (config.getAllMembers().size() / 2) + 1;
     }
 
+    // -----------------------------
+    // Message handling entry point
+    // -----------------------------
     public void handleMessage(String rawJson) {
         profile.simulateNetworkDelay();
         if (profile.shouldDrop()) {
@@ -60,6 +71,77 @@ public class PaxosHandler {
         }
     }
 
+    // -----------------------------
+    // Proposer logic
+    // -----------------------------
+
+    private int myNumericId() {
+        return Integer.parseInt(memberId.replaceAll("\\D+", ""));
+    }
+
+    private String nextProposalNumber() {
+        localRound++;
+        return localRound + "." + myNumericId();
+    }
+
+    public synchronized void propose(String value) {
+        if (consensusReached) {
+            log("[PROPOSER] Consensus already reached; ignoring new proposal.");
+            return;
+        }
+        this.myProposedValue = value;
+        this.currentProposalN = nextProposalNumber();
+        this.promises = 0;
+        this.highestAcceptedNSeen = null;
+        this.valueSuggestedByAcceptors = null;
+
+        Message m = new Message();
+        m.setType(Message.MessageType.PREPARE);
+        m.setSenderId(memberId);
+        m.setProposalNumber(currentProposalN);
+        sendToAllExceptSelf(gson.toJson(m));
+        log("[PROPOSER][PREPARE] n=" + currentProposalN + " v=" + myProposedValue);
+    }
+
+    private synchronized void handlePromise(Message msg) {
+        if (currentProposalN == null || !currentProposalN.equals(msg.getProposalNumber())) {
+            log("[PROPOSER][PROMISE] ignoring: for different proposal n=" + msg.getProposalNumber());
+            return;
+        }
+        promises++;
+
+        String prevN = msg.getPrevAcceptedN();
+        String prevV = msg.getValue();
+        if (prevN != null) {
+            if (highestAcceptedNSeen == null || compareProposal(prevN, highestAcceptedNSeen) > 0) {
+                highestAcceptedNSeen = prevN;
+                valueSuggestedByAcceptors = prevV;
+            }
+        }
+
+        log("[PROPOSER][PROMISE RECEIVED] from=" + msg.getSenderId() +
+                " count=" + promises + "/" + quorumSize +
+                (prevN != null ? (" prev=(" + prevN + "," + prevV + ")") : ""));
+
+        if (promises >= quorumSize) {
+            String valueToPropose = (valueSuggestedByAcceptors != null)
+                    ? valueSuggestedByAcceptors
+                    : myProposedValue;
+
+            Message acc = new Message();
+            acc.setType(Message.MessageType.ACCEPT_REQUEST);
+            acc.setSenderId(memberId);
+            acc.setProposalNumber(currentProposalN);
+            acc.setValue(valueToPropose);
+
+            sendToAllExceptSelf(gson.toJson(acc));
+            log("[PROPOSER][ACCEPT_REQUEST] n=" + currentProposalN + " v=" + valueToPropose);
+        }
+    }
+
+    // -----------------------------
+    // Acceptor logic
+    // -----------------------------
     private void handlePrepare(Message msg) {
         String proposalNum = msg.getProposalNumber();
         String sender = msg.getSenderId();
@@ -72,19 +154,14 @@ public class PaxosHandler {
             promise.setSenderId(memberId);
             promise.setProposalNumber(proposalNum);
             promise.setValue(acceptedValue);
+            promise.setPrevAcceptedN(acceptedN);
 
             sendTo(sender, gson.toJson(promise));
-            log("[ACCEPTOR][PROMISE] to=" + sender + " n=" + proposalNum);
+            log("[ACCEPTOR][PROMISE] to=" + sender + " n=" + proposalNum +
+                    (acceptedN != null ? (" prev=(" + acceptedN + "," + acceptedValue + ")") : ""));
         } else {
             log("[ACCEPTOR][IGNORE] n=" + proposalNum + " < promisedN=" + promisedN);
         }
-    }
-
-    private void handlePromise(Message msg) {
-        log("[PROPOSER][PROMISE RECEIVED] from=" + msg.getSenderId()
-                + " n=" + msg.getProposalNumber()
-                + " v=" + msg.getValue());
-        // TODO: Future step: collect promises, then send ACCEPT_REQUEST
     }
 
     private void handleAcceptRequest(Message msg) {
@@ -110,6 +187,9 @@ public class PaxosHandler {
         }
     }
 
+    // -----------------------------
+    // Learner logic
+    // -----------------------------
     private void handleAccepted(Message msg) {
         if (consensusReached) return;
 
@@ -123,10 +203,23 @@ public class PaxosHandler {
         }
     }
 
+    // -----------------------------
+    // Network utilities
+    // -----------------------------
     private void sendTo(String targetMember, String messageJson) {
         try {
             int port = config.getPort(targetMember);
-            Socket socket = new Socket("localhost", port);
+            // If you have getHost(...), use it; otherwise keep "localhost"
+            String host;
+            try {
+                host = (String) NetworkConfig.class
+                        .getMethod("getHost", String.class)
+                        .invoke(config, targetMember);
+            } catch (ReflectiveOperationException noHostMethod) {
+                host = "localhost";
+            }
+
+            Socket socket = new Socket(host, port);
             BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             out.write(messageJson);
             out.newLine();

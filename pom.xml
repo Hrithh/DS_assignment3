@@ -26,7 +26,7 @@
 
     <build>
         <plugins>
-            <!-- Ensures project compiles cleanly for Java 11 -->
+            <!-- Java 11 compilation -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -37,13 +37,13 @@
                 </configuration>
             </plugin>
 
-            <!-- Exec plugin for running PaxosNode -->
+            <!-- Allow flexible execution of any class -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
                 <configuration>
-                    <mainClass>au.edu.adelaide.ds.assignment3.PaxosNode</mainClass>
+                    <mainClass>${exec.mainClass}</mainClass>
                 </configuration>
             </plugin>
         </plugins>
