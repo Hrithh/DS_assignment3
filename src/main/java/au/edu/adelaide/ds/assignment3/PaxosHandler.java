@@ -74,7 +74,6 @@ public class PaxosHandler {
     // -----------------------------
     // Proposer logic
     // -----------------------------
-
     private int myNumericId() {
         return Integer.parseInt(memberId.replaceAll("\\D+", ""));
     }
@@ -101,6 +100,18 @@ public class PaxosHandler {
         m.setProposalNumber(currentProposalN);
         sendToAllExceptSelf(gson.toJson(m));
         log("[PROPOSER][PREPARE] n=" + currentProposalN + " v=" + myProposedValue);
+
+        // timeout & re-propose with higher n if no quorum in time
+        new Thread(() -> {
+            try { Thread.sleep(3000); } catch (InterruptedException ignored) {}
+            synchronized (PaxosHandler.this) {
+                if (!consensusReached && currentProposalN != null && promises < quorumSize) {
+                    log("[PROPOSER] Timeout waiting for quorum; re-proposing with higher n");
+                    // Re-use the same value; increment round automatically
+                    propose(this.myProposedValue);
+                }
+            }
+        }, "proposer-timeout").start();
     }
 
     private synchronized void handlePromise(Message msg) {
@@ -142,7 +153,7 @@ public class PaxosHandler {
     // -----------------------------
     // Acceptor logic
     // -----------------------------
-    private void handlePrepare(Message msg) {
+    private synchronized void handlePrepare(Message msg) {
         String proposalNum = msg.getProposalNumber();
         String sender = msg.getSenderId();
 
@@ -164,9 +175,8 @@ public class PaxosHandler {
         }
     }
 
-    private void handleAcceptRequest(Message msg) {
+    private synchronized void handleAcceptRequest(Message msg) {
         String proposalNum = msg.getProposalNumber();
-        String sender = msg.getSenderId();
         String value = msg.getValue();
 
         if (promisedN == null || compareProposal(proposalNum, promisedN) >= 0) {
@@ -190,7 +200,7 @@ public class PaxosHandler {
     // -----------------------------
     // Learner logic
     // -----------------------------
-    private void handleAccepted(Message msg) {
+    private synchronized void handleAccepted(Message msg) {
         if (consensusReached) return;
 
         String value = msg.getValue();
@@ -198,6 +208,8 @@ public class PaxosHandler {
 
         if (acceptedCounts.get(value) >= quorumSize) {
             consensusReached = true;
+            // Assignment-style output plus detailed line
+            System.out.printf("CONSENSUS: %s has been elected Council President.%n", value);
             System.out.printf("[%s][LEARNER][CONSENSUS] value=%s proposal=%s%n",
                     memberId, value, msg.getProposalNumber());
         }
@@ -207,18 +219,25 @@ public class PaxosHandler {
     // Network utilities
     // -----------------------------
     private void sendTo(String targetMember, String messageJson) {
-        try {
-            String host = config.getHost(targetMember);
-            int port = config.getPort(targetMember);
+        String host = config.getHost(targetMember);
+        int port = config.getPort(targetMember);
 
-            Socket socket = new Socket(host, port);
-            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-            out.write(messageJson);
-            out.newLine();
-            out.flush();
-            socket.close();
-        } catch (Exception e) {
-            System.err.printf("[%s] Failed to send to %s: %s%n", memberId, targetMember, e.getMessage());
+        int attempts = 5;
+        for (int i = 1; i <= attempts; i++) {
+            try (Socket socket = new Socket(host, port);
+                 BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))) {
+                out.write(messageJson);
+                out.newLine();
+                out.flush();
+                return; // success
+            } catch (Exception e) {
+                if (i == attempts) {
+                    System.err.printf("[%s] Failed to send to %s after %d tries: %s%n",
+                            memberId, targetMember, attempts, e.getMessage());
+                } else {
+                    try { Thread.sleep(200L * i); } catch (InterruptedException ignored) {}
+                }
+            }
         }
     }
 
