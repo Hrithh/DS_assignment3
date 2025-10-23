@@ -1,8 +1,0 @@
-[M7][5ms] Starting on port 9007 with profile: standard
-[M7][63ms] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
-[M7][2059ms] [ACCEPTOR][PROMISE] to=M4 n=1.4
-[M7][2296ms] [ACCEPTOR][ACCEPTED] value=LEADER_M5 n=1.4
-[M7][2309ms] [ACCEPTOR][ACCEPTED] value=LEADER_M5 n=1.4
-[M7][2417ms] CONSENSUS: LEADER_M5 has been elected Council President.
-[M7][2417ms] [LEARNER][CONSENSUS] value=LEADER_M5 proposal=1.4
-[M7][2756ms] [ACCEPTOR][ACCEPTED] value=LEADER_M5 n=1.4

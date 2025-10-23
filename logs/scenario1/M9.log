@@ -1,9 +1,0 @@
-[M9] Starting on port 9009 with profile: reliable
-[M9] Type a value to propose (ex: LEADER_M5). Commands: /help, /q
-[M9] [ACCEPTOR][PROMISE] to=M4 n=1.4
-[M9] [ACCEPTOR][ACCEPTED] value=LEADER_M5 n=1.4
-CONSENSUS: LEADER_M5 has been elected Council President.
-[M9][LEARNER][CONSENSUS] value=LEADER_M5 proposal=1.4
-[M9] [ACCEPTOR][ACCEPTED] value=LEADER_M5 n=1.4
-[M9] [ACCEPTOR][ACCEPTED] value=LEADER_M5 n=1.4
-[M9] [ACCEPTOR][ACCEPTED] value=LEADER_M5 n=1.4

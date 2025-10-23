@@ -7,25 +7,33 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Handles all Paxos protocol logic for a single CouncilMember node.
+ * <p>
+ * This class encapsulates the roles of proposer, acceptor, and learner
+ * within the Paxos algorithm. It manages message parsing, proposal
+ * generation, state tracking, and quorum-based decision making.
+ * </p>
+ */
 public class PaxosHandler {
     private final String memberId;
     private final NetworkConfig config;
     private final Profile profile;
     private final Gson gson = new Gson();
 
-    // Acceptor state
+    //Acceptor state
     private String promisedN = null;
     private String acceptedN = null;
     private String acceptedValue = null;
 
-    // Learner state
+    //Learner state
     private final Map<String, Integer> acceptedCounts = new HashMap<>();
     private boolean consensusReached = false;
 
-    // Majority tracking
+    //Majority tracking
     private final int quorumSize;
 
-    // Proposer state
+    //Proposer state
     private String currentProposalN = null;
     private String myProposedValue = null;
     private int promises = 0;
@@ -33,6 +41,13 @@ public class PaxosHandler {
     private String valueSuggestedByAcceptors = null;
     private int localRound = 0;
 
+    /**
+     * Constructs a new PaxosHandler for a CouncilMember.
+     *
+     * @param memberId unique identifier for this node
+     * @param config   network configuration containing all peers and ports
+     * @param profile  reliability/latency behavior profile for network simulation
+     */
     public PaxosHandler(String memberId, NetworkConfig config, Profile profile) {
         this.memberId = memberId;
         this.config = config;
@@ -43,6 +58,12 @@ public class PaxosHandler {
     // -----------------------------
     // Local logging with timestamp
     // -----------------------------
+    /**
+     * Prints a timestamped, node-prefixed log message for this PaxosHandler.
+     *
+     * @param fmt  the message format string
+     * @param args arguments for message formatting
+     */
     private void log(String fmt, Object... args) {
         long t = System.currentTimeMillis() - CouncilMember.T0;
         String prefix = String.format("[%s][%dms] ", memberId, t);
@@ -52,6 +73,15 @@ public class PaxosHandler {
     // -----------------------------
     // Message handling entry point
     // -----------------------------
+    /**
+     * Entry point for handling an incoming Paxos message.
+     * <p>
+     * Deserializes the JSON, applies simulated delay/drop based on profile,
+     * and delegates to the appropriate role handler.
+     * </p>
+     *
+     * @param rawJson raw JSON string received from a peer node
+     */
     public void handleMessage(String rawJson) {
         profile.simulateNetworkDelay();
         if (profile.shouldDrop()) {
@@ -83,15 +113,38 @@ public class PaxosHandler {
     // -----------------------------
     // Proposer logic
     // -----------------------------
+    /**
+     * Extracts the numeric component of this member's ID ("M4" → 4).
+     *
+     * @return integer ID component of this member
+     */
     private int myNumericId() {
         return Integer.parseInt(memberId.replaceAll("\\D+", ""));
     }
 
+    /**
+     * Generates the next unique proposal number for this proposer.
+     * <p>
+     * Follows the format {@code round.memberId} ("2.4").
+     * </p>
+     *
+     * @return proposal number string
+     */
     private String nextProposalNumber() {
         localRound++;
         return localRound + "." + myNumericId();
     }
 
+    /**
+     * Initiates a new proposal round for the given value.
+     * <p>
+     * Sends PREPARE messages to all peers and waits for quorum PROMISE responses.
+     * Automatically retries with a higher proposal number if no quorum is reached
+     * within a timeout window.
+     * </p>
+     *
+     * @param value the proposed value ("LEADER_M5")
+     */
     public synchronized void propose(String value) {
         if (consensusReached) {
             log("[PROPOSER] Consensus already reached; ignoring new proposal.");
@@ -122,6 +175,15 @@ public class PaxosHandler {
         }, "proposer-timeout").start();
     }
 
+    /**
+     * Handles a PROMISE message received in response to a PREPARE.
+     * <p>
+     * Tracks received promises and determines whether to proceed with
+     * an ACCEPT_REQUEST once quorum is achieved.
+     * </p>
+     *
+     * @param msg the PROMISE message received from an acceptor
+     */
     private synchronized void handlePromise(Message msg) {
         if (currentProposalN == null || !currentProposalN.equals(msg.getProposalNumber())) {
             log("[PROPOSER][PROMISE] ignoring: for different proposal n=%s", msg.getProposalNumber());
@@ -161,6 +223,15 @@ public class PaxosHandler {
     // -----------------------------
     // Acceptor logic
     // -----------------------------
+    /**
+     * Handles a PREPARE message received from a proposer.
+     * <p>
+     * Replies with a PROMISE if this proposal number is higher than any previously
+     * promised number; otherwise, the message is ignored.
+     * </p>
+     *
+     * @param msg the PREPARE message received
+     */
     private synchronized void handlePrepare(Message msg) {
         String proposalNum = msg.getProposalNumber();
         String sender = msg.getSenderId();
@@ -183,6 +254,16 @@ public class PaxosHandler {
         }
     }
 
+    /**
+     * Handles an ACCEPT_REQUEST message from a proposer.
+     * <p>
+     * If the proposal number is at least as large as any previously promised number,
+     * the value is accepted and an ACCEPTED message is broadcast to all peers.
+     * Otherwise, the request is rejected.
+     * </p>
+     *
+     * @param msg the ACCEPT_REQUEST message received
+     */
     private synchronized void handleAcceptRequest(Message msg) {
         String proposalNum = msg.getProposalNumber();
         String value = msg.getValue();
@@ -208,6 +289,15 @@ public class PaxosHandler {
     // -----------------------------
     // Learner logic
     // -----------------------------
+    /**
+     * Handles an ACCEPTED message from another node.
+     * <p>
+     * Tracks how many nodes have accepted each value and declares
+     * consensus once a quorum agrees on the same value.
+     * </p>
+     *
+     * @param msg the ACCEPTED message received from a peer
+     */
     private synchronized void handleAccepted(Message msg) {
         if (consensusReached) return;
 
@@ -224,6 +314,12 @@ public class PaxosHandler {
     // -----------------------------
     // Network utilities
     // -----------------------------
+    /**
+     * Sends a JSON-encoded message to a specific target member, retrying several times on failure.
+     *
+     * @param targetMember the member ID to send the message to
+     * @param messageJson  serialized JSON message payload
+     */
     private void sendTo(String targetMember, String messageJson) {
         String host = config.getHost(targetMember);
         int port = config.getPort(targetMember);
@@ -247,6 +343,11 @@ public class PaxosHandler {
         }
     }
 
+    /**
+     * Sends a message to all peers in the configuration except this node.
+     *
+     * @param messageJson serialized JSON message payload
+     */
     private void sendToAllExceptSelf(String messageJson) {
         for (String target : config.getAllMembers()) {
             if (!target.equals(memberId)) {
@@ -255,6 +356,13 @@ public class PaxosHandler {
         }
     }
 
+    /**
+     * Compares two proposal numbers of the form "round.memberId".
+     *
+     * @param a first proposal number string
+     * @param b second proposal number string
+     * @return positive if {@code a > b}, negative if {@code a < b}, or zero if equal
+     */
     private int compareProposal(String a, String b) {
         String[] aParts = a.split("\\.");
         String[] bParts = b.split("\\.");

@@ -4,22 +4,59 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 
+/**
+ * The {@code CouncilMember} class represents one node in the distributed Paxos consensus system.
+ * <p>
+ * Each CouncilMember listens for incoming Paxos messages from peers,
+ * participates as a proposer, acceptor, and learner, and can optionally
+ * initiate proposals either interactively or automatically after a delay.
+ * </p>
+ */
 public class CouncilMember {
 
     // --- Timing helper (for timestamped logs) ---
     static final long T0 = System.currentTimeMillis();
 
+    /**
+     * Logs a formatted message with the current member ID and milliseconds since startup.
+     *
+     * @param fmt  the message format string, as accepted by {@link String#format(String, Object...)}
+     * @param args the arguments to substitute into the format string
+     */
     public static void log(String fmt, Object... args) {
         long t = System.currentTimeMillis() - T0;
         String prefix = String.format("[%s][%dms] ", memberId, t);
         System.out.printf(prefix + fmt + "%n", args);
     }
 
+    //Unique identifier of this CouncilMember
     public static String memberId;
+
+    //Profile controlling simulated reliability, latency, and failure behavior.
     public static Profile profile;
+
+    //Listening port for this node, loaded from {@code network.config}.
     public static int port;
+
+    //Shared configuration describing all nodes in the network.
     public static NetworkConfig config;
 
+    /**
+     * Entry point for a CouncilMember process.
+     * <p>
+     * Initializes the node based on command‑line parameters, creates its server socket,
+     * and spawns threads to handle incoming Paxos messages. It may also schedule a
+     * proposal automatically after startup or allow manual proposals via standard input.
+     * </p>
+     *
+     * @param args command‑line arguments:
+     *             <ul>
+     *                 <li>{@code <MemberID>} — e.g. {@code M4}</li>
+     *                 <li>{@code --profile=<reliable|standard|latent|failure>}</li>
+     *                 <li>(optional) {@code --propose=<VALUE>} — initial value to propose</li>
+     *                 <li>(optional) {@code --trigger-after=<ms>} — delay before automatic proposal</li>
+     *             </ul>
+     */
     public static void main(String[] args) {
         // Args:
         //   <MemberID> --profile=<reliable|standard|latent|failure> [--propose=<VALUE>]
@@ -31,8 +68,8 @@ public class CouncilMember {
         memberId = args[0].trim();
         String profileArg = args[1].substring("--profile=".length()).trim();
 
-        String proposeArg = null;           // e.g., --propose=LEADER_M5
-        Long triggerAfterMs = null;         // e.g., --trigger-after=3000
+        String proposeArg = null;           //--propose=LEADER_M5
+        Long triggerAfterMs = null;         //--trigger-after=3000
 
         for (String a : args) {
             if (a != null && a.startsWith("--propose=")) {
@@ -54,7 +91,7 @@ public class CouncilMember {
             ServerSocket serverSocket = new ServerSocket(port);
             PaxosHandler paxos = new PaxosHandler(memberId, config, profile);
 
-            // Schedule a proposal AFTER startup (no second process, satisfies "launch then trigger")
+            //Schedule a proposal AFTER startup (no second process, satisfies "launch then trigger")
             if (proposeArg != null && triggerAfterMs != null && triggerAfterMs >= 0) {
                 final String v = proposeArg;
                 final long delay = triggerAfterMs;
@@ -65,7 +102,7 @@ public class CouncilMember {
                 }, "scheduled-proposer").start();
             }
 
-            // Keep your interactive stdin thread if you want, that’s fine:
+            //Keep your interactive stdin thread if you want, that’s fine:
             startInteractiveProposer(paxos);
 
             while (true) {
@@ -90,6 +127,20 @@ public class CouncilMember {
     // -------------------------------
     // Interactive proposer (System.in)
     // -------------------------------
+    /**
+     * Starts a daemon thread that reads commands from standard input and allows
+     * a user to manually propose values during runtime.
+     * <p>
+     * Supported commands:
+     * <ul>
+     *   <li>Type any non-empty string (e.g., {@code LEADER_M3}) to initiate a proposal.</li>
+     *   <li>{@code /help} — display brief usage information.</li>
+     *   <li>{@code /q} or {@code exit} — stop reading further input.</li>
+     * </ul>
+     * </p>
+     *
+     * @param paxos the {@link PaxosHandler} instance to which manual proposals are submitted
+     */
     private static void startInteractiveProposer(PaxosHandler paxos) {
         Thread t = new Thread(() -> {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
@@ -113,7 +164,7 @@ public class CouncilMember {
             }
         }, "stdin-proposer");
 
-        t.setDaemon(true);  // won’t block process exit
+        t.setDaemon(true);  //won’t block process exit
         t.start();
     }
 }

@@ -25,6 +25,19 @@ mkdir -p "$LOG_DIR" "$PIPES_DIR"
 
 banner () { echo -e "\n====================== $1 ======================\n"; }
 
+usage () {
+  cat <<EOF
+Usage:
+  $(basename "$0") [clean | all | 1 | 2 | 3a | 3b | 3c]...
+
+Examples:
+  $(basename "$0") 1
+  $(basename "$0") 2 3a 3c
+  $(basename "$0") all
+  $(basename "$0") clean          # deletes everything under '$LOG_DIR/'
+EOF
+}
+
 cleanup_all () {
   # kill all children we started
   for pid in "${PIDS[@]:-}"; do
@@ -72,7 +85,6 @@ ensure_fifo () {
 }
 
 # convenience: write a line into FIFO (proposal value)
-# this is equivalent to typing into the node’s console
 propose_via_fifo () {
   local fifo="$1" value="$2"
   # Use subshell to avoid blocking if no reader yet
@@ -110,254 +122,324 @@ start_cluster () {
 # ----------------------------
 # Scenario 1: Ideal network (all reliable)
 # ----------------------------
-: <<'SCENARIO1_DISABLED'
-banner "SCENARIO 1: Ideal network (all reliable)"
-mkdir -p "${LOG_DIR}/scenario1"
+scenario_1 () {
+  local scenario="scenario1"
+  banner "SCENARIO 1: Ideal network (all reliable)"
+  mkdir -p "${LOG_DIR}/${scenario}"
 
-# Start all 9 members (reliable). M4 will propose after 3s.
-for i in {1..9}; do
-  id="M${i}"
-  log="${LOG_DIR}/scenario1/${id}.log"
+  # Start all 9 members (reliable). M4 proposes after 3s.
+  for i in {1..9}; do
+    local id="M${i}"
+    local log="${LOG_DIR}/${scenario}/${id}.log"
 
-  if [[ "$i" == "4" ]]; then
-    # Use helper so PID is tracked and we can clean up later.
-    # We don’t need a FIFO here because we’re using --propose/--trigger-after.
-    nohup mvn -q exec:java \
-      "-Dexec.mainClass=${PROJECT_MAIN}" \
-      "-Dexec.args=${id} --profile=reliable --propose=LEADER_M5 --trigger-after=3000" \
-      > "$log" 2>&1 &
-  else
-    nohup mvn -q exec:java \
-      "-Dexec.mainClass=${PROJECT_MAIN}" \
-      "-Dexec.args=${id} --profile=reliable" \
-      > "$log" 2>&1 &
-  fi
-
-  pid=$!
-  PIDS+=("$pid")
-  PID_MAP["$id"]=$pid
-done
-
-echo "All 9 members launched. Waiting ${STARTUP_WAIT}s for sockets..."
-sleep "$STARTUP_WAIT"
-
-echo "M4 will propose LEADER_M5 in ~3s (from process start). Allowing ${SCENARIO_TIME}s for consensus..."
-sleep "$SCENARIO_TIME"
-
-echo "Cleaning up Scenario 1 processes..."
-cleanup_all
-echo "Scenario 1 logs in ${LOG_DIR}/scenario1"
-
-# ----------------------------
-# Scenario 2: Concurrent proposals (M1 vs M8)
-# ----------------------------
-banner "SCENARIO 2: Concurrent proposals (M1 vs M8)"
-cleanup_all
-mkdir -p "${LOG_DIR}/scenario2"
-
-# Launch all 9 members (all reliable)
-for i in {1..9}; do
-  id="M${i}"
-  log="${LOG_DIR}/scenario2/${id}.log"
-
-  case "$i" in
-    1)
-      # M1 proposes itself after 2s
+    if [[ "$i" == "4" ]]; then
+      # M4 will auto-propose after 3000 ms
       nohup mvn -q exec:java \
         "-Dexec.mainClass=${PROJECT_MAIN}" \
-        "-Dexec.args=${id} --profile=reliable --propose=LEADER_M1 --trigger-after=2000" \
+        "-Dexec.args=${id} --profile=reliable --propose=LEADER_M5 --trigger-after=3000" \
         > "$log" 2>&1 &
-      ;;
-    8)
-      # M8 proposes itself after 2s (same as M1 to force conflict)
-      nohup mvn -q exec:java \
-        "-Dexec.mainClass=${PROJECT_MAIN}" \
-        "-Dexec.args=${id} --profile=reliable --propose=LEADER_M8 --trigger-after=2000" \
-        > "$log" 2>&1 &
-      ;;
-    *)
+    else
+      # Other members just start with reliable profile
       nohup mvn -q exec:java \
         "-Dexec.mainClass=${PROJECT_MAIN}" \
         "-Dexec.args=${id} --profile=reliable" \
         > "$log" 2>&1 &
-      ;;
-  esac
+    fi
 
-  pid=$!
-  PIDS+=("$pid")
-  PID_MAP["$id"]=$pid
-done
+    local pid=$!
+    PIDS+=("$pid")
+    PID_MAP["$id"]=$pid
+  done
 
-echo "Scenario 2: all 9 members launched. Waiting ${STARTUP_WAIT}s for sockets..."
-sleep "$STARTUP_WAIT"
-echo "M1 and M8 will both propose after ~2s. Allowing ${SCENARIO_TIME}s for consensus..."
-sleep "$SCENARIO_TIME"
+  echo "All 9 members launched. Waiting ${STARTUP_WAIT}s for sockets..."
+  sleep "$STARTUP_WAIT"
 
-echo "Cleaning up Scenario 2 processes..."
-cleanup_all
-echo "Scenario 2 logs in ${LOG_DIR}/scenario2"
+  echo "M4 will propose LEADER_M5 in ~3s (from process start). Allowing ${SCENARIO_TIME}s for consensus..."
+  sleep "$SCENARIO_TIME"
+
+  echo "Cleaning up Scenario 1 processes..."
+  cleanup_all
+  echo "Scenario 1 logs in ${LOG_DIR}/${scenario}"
+}
+
+# ----------------------------
+# Scenario 2: Concurrent proposals (M1 vs M8)
+# ----------------------------
+scenario_2 () {
+  local scenario="scenario2"
+  banner "SCENARIO 2: Concurrent proposals (M1 vs M8)"
+  cleanup_all
+  mkdir -p "${LOG_DIR}/${scenario}"
+
+  # Launch all 9 members (all reliable)
+  for i in {1..9}; do
+    local id="M${i}"
+    local log="${LOG_DIR}/${scenario}/${id}.log"
+
+    case "$i" in
+      1)
+        # M1 proposes itself after 2s
+        nohup mvn -q exec:java \
+          "-Dexec.mainClass=${PROJECT_MAIN}" \
+          "-Dexec.args=${id} --profile=reliable --propose=LEADER_M1 --trigger-after=2000" \
+          > "$log" 2>&1 &
+        ;;
+      8)
+        # M8 proposes itself after 2s (same as M1 to force conflict)
+        nohup mvn -q exec:java \
+          "-Dexec.mainClass=${PROJECT_MAIN}" \
+          "-Dexec.args=${id} --profile=reliable --propose=LEADER_M8 --trigger-after=2000" \
+          > "$log" 2>&1 &
+        ;;
+      *)
+        nohup mvn -q exec:java \
+          "-Dexec.mainClass=${PROJECT_MAIN}" \
+          "-Dexec.args=${id} --profile=reliable" \
+          > "$log" 2>&1 &
+        ;;
+    esac
+
+    local pid=$!
+    PIDS+=("$pid")
+    PID_MAP["$id"]=$pid
+  done
+
+  echo "Scenario 2: all 9 members launched. Waiting ${STARTUP_WAIT}s for sockets..."
+  sleep "$STARTUP_WAIT"
+  echo "M1 and M8 will both propose after ~2s. Allowing ${SCENARIO_TIME}s for consensus..."
+  sleep "$SCENARIO_TIME"
+
+  echo "Cleaning up Scenario 2 processes..."
+  cleanup_all
+  echo "Scenario 2 logs in ${LOG_DIR}/${scenario}"
+}
 
 # ----------------------------
 # Scenario 3a: Fault tolerance mix; M4 proposes
 # ----------------------------
-banner "SCENARIO 3a: Fault tolerance mix; M4 proposes"
-mkdir -p "${LOG_DIR}/scenario3a"
+scenario_3a () {
+  local scenario="scenario3a"
+  banner "SCENARIO 3a: Fault tolerance mix; M4 proposes"
+  mkdir -p "${LOG_DIR}/${scenario}"
 
-# (Optional) give this one a little more time
-SCEN3A_TIME=30
+  local SCEN3A_TIME=30
 
-# Launch all 9 with mixed profiles; only M4 has a scheduled proposal
-for i in {1..9}; do
-  id="M${i}"
-  log="${LOG_DIR}/scenario3a/${id}.log"
+  # Launch all 9 with mixed profiles; only M4 has a scheduled proposal
+  for i in {1..9}; do
+    local id="M${i}"
+    local log="${LOG_DIR}/${scenario}/${id}.log"
+    local profile
+    case "$id" in
+      M1) profile="reliable" ;;
+      M2) profile="latent" ;;
+      M3) profile="failure" ;;
+      *)  profile="standard" ;;
+    esac
 
-  case "$id" in
-    M1) profile="reliable" ;;
-    M2) profile="latent" ;;
-    M3) profile="failure" ;;
-    *)  profile="standard" ;;
-  esac
+    if [[ "$id" == "M4" ]]; then
+      # M4 will propose after 2s
+      nohup mvn -q exec:java \
+        "-Dexec.mainClass=${PROJECT_MAIN}" \
+        "-Dexec.args=${id} --profile=${profile} --propose=LEADER_M5 --trigger-after=2000" \
+        > "$log" 2>&1 &
+    else
+      nohup mvn -q exec:java \
+        "-Dexec.mainClass=${PROJECT_MAIN}" \
+        "-Dexec.args=${id} --profile=${profile}" \
+        > "$log" 2>&1 &
+    fi
 
-  if [[ "$id" == "M4" ]]; then
-    # M4 will propose after 2s
-    nohup mvn -q exec:java \
-      "-Dexec.mainClass=${PROJECT_MAIN}" \
-      "-Dexec.args=${id} --profile=${profile} --propose=LEADER_M5 --trigger-after=2000" \
-      > "$log" 2>&1 &
-  else
-    nohup mvn -q exec:java \
-      "-Dexec.mainClass=${PROJECT_MAIN}" \
-      "-Dexec.args=${id} --profile=${profile}" \
-      > "$log" 2>&1 &
-  fi
+    local pid=$!
+    PIDS+=("$pid")
+    PID_MAP["$id"]=$pid
+  done
 
-  pid=$!
-  PIDS+=("$pid")
-  PID_MAP["$id"]=$pid
-done
+  echo "Scenario 3a cluster launched. Waiting ${STARTUP_WAIT}s for sockets..."
+  sleep "$STARTUP_WAIT"
 
-echo "Scenario 3a cluster launched. Waiting ${STARTUP_WAIT}s for sockets..."
-sleep "$STARTUP_WAIT"
+  echo "Allowing ${SCEN3A_TIME}s for consensus under latency/failure mix..."
+  sleep "$SCEN3A_TIME"
 
-echo "Allowing ${SCEN3A_TIME}s for consensus under latency/failure mix..."
-sleep "$SCEN3A_TIME"
-
-echo "Cleaning up Scenario 3a processes..."
-cleanup_all
-echo "Scenario 3a logs in ${LOG_DIR}/scenario3a"
+  echo "Cleaning up Scenario 3a processes..."
+  cleanup_all
+  echo "Scenario 3a logs in ${LOG_DIR}/${scenario}"
+}
 
 # ----------------------------
 # Scenario 3b: Fault tolerance mix; M2 (latent) proposes
 # ----------------------------
-banner "SCENARIO 3b: Fault tolerance mix; M2 (latent) proposes"
-mkdir -p "${LOG_DIR}/scenario3b"
+scenario_3b () {
+  local scenario="scenario3b"
+  banner "SCENARIO 3b: Fault tolerance mix; M2 (latent) proposes"
+  mkdir -p "${LOG_DIR}/${scenario}"
 
-# Launch all 9 with the requested profile mix
-for i in {1..9}; do
-  id="M${i}"
-  log="${LOG_DIR}/scenario3b/${id}.log"
+  for i in {1..9}; do
+    local id="M${i}"
+    local log="${LOG_DIR}/${scenario}/${id}.log"
+    local profile
+    case "$i" in
+      1) profile="reliable" ;;
+      2) profile="latent"   ;;   # proposer (latent)
+      3) profile="failure"  ;;
+      *) profile="standard" ;;
+    esac
 
-  case "$i" in
-    1) profile="reliable" ;;
-    2) profile="latent"   ;;   # proposer (latent)
-    3) profile="failure"  ;;
-    *) profile="standard" ;;
-  esac
+    if [[ "$i" == "2" ]]; then
+      # M2 (latent) proposes after ~2s
+      nohup mvn -q exec:java \
+        "-Dexec.mainClass=${PROJECT_MAIN}" \
+        "-Dexec.args=${id} --profile=${profile} --propose=LEADER_M2 --trigger-after=2000" \
+        > "$log" 2>&1 &
+    else
+      nohup mvn -q exec:java \
+        "-Dexec.mainClass=${PROJECT_MAIN}" \
+        "-Dexec.args=${id} --profile=${profile}" \
+        > "$log" 2>&1 &
+    fi
 
-  if [[ "$i" == "2" ]]; then
-    # M2 (latent) proposes after ~2s
-    nohup mvn -q exec:java \
-      "-Dexec.mainClass=${PROJECT_MAIN}" \
-      "-Dexec.args=${id} --profile=${profile} --propose=LEADER_M2 --trigger-after=2000" \
-      > "$log" 2>&1 &
-  else
-    nohup mvn -q exec:java \
-      "-Dexec.mainClass=${PROJECT_MAIN}" \
-      "-Dexec.args=${id} --profile=${profile}" \
-      > "$log" 2>&1 &
-  fi
+    local pid=$!
+    PIDS+=("$pid")
+    PID_MAP["$id"]=$pid
+  done
 
-  pid=$!
-  PIDS+=("$pid")
-  PID_MAP["$id"]=$pid
-done
+  echo "Scenario 3b cluster launched. Waiting ${STARTUP_WAIT}s for sockets..."
+  sleep "$STARTUP_WAIT"
 
-echo "Scenario 3b cluster launched. Waiting ${STARTUP_WAIT}s for sockets..."
-sleep "$STARTUP_WAIT"
+  echo "Allowing ${SCENARIO_TIME}s for consensus under latency/failure mix..."
+  sleep "$SCENARIO_TIME"
 
-echo "Allowing ${SCENARIO_TIME}s for consensus under latency/failure mix..."
-sleep "$SCENARIO_TIME"
-
-echo "Cleaning up Scenario 3b processes..."
-cleanup_all
-echo "Scenario 3b logs in ${LOG_DIR}/scenario3b"
-SCENARIO1_DISABLED
+  echo "Cleaning up Scenario 3b processes..."
+  cleanup_all
+  echo "Scenario 3b logs in ${LOG_DIR}/${scenario}"
+}
 
 # ----------------------------
 # Scenario 3c: M3 proposes then crashes; others recover
 # ----------------------------
-banner "SCENARIO 3c: Fault tolerance mix; M3 proposes then crashes"
+scenario_3c () {
+  local scenario="scenario3c"
+  banner "SCENARIO 3c: Fault tolerance mix; M3 proposes then crashes"
+  local SC3_DIR="${LOG_DIR}/${scenario}"
+  mkdir -p "${SC3_DIR}"
 
-SC3_DIR="${LOG_DIR}/scenario3c"
-mkdir -p "${SC3_DIR}"
+  # profiles per member (M1 reliable, M2 latent, M3 failure, M4–M9 standard)
+  declare -A PROFILE_MAP=(
+    [M1]=reliable
+    [M2]=latent
+    [M3]=failure
+    [M4]=standard
+    [M5]=standard
+    [M6]=standard
+    [M7]=standard
+    [M8]=standard
+    [M9]=standard
+  )
 
-# profiles per member (M1 reliable, M2 latent, M3 failure, M4–M9 standard)
-declare -A PROFILE_MAP=(
-  [M1]=reliable
-  [M2]=latent
-  [M3]=failure
-  [M4]=standard
-  [M5]=standard
-  [M6]=standard
-  [M7]=standard
-  [M8]=standard
-  [M9]=standard
-)
+  # Launch all 9. Give M3 a scheduled proposal, then crash it.
+  # Also schedule M4 to start a new election later, to ensure recovery.
+  for i in {1..9}; do
+    local id="M${i}"
+    local profile="${PROFILE_MAP[$id]}"
+    local log="${SC3_DIR}/${id}.log"
 
-# Launch all 9. Give M3 a scheduled proposal, then crash it.
-# Also schedule M4 to start a new election later, to ensure recovery.
-for i in {1..9}; do
-  id="M${i}"
-  profile="${PROFILE_MAP[$id]}"
-  log="${SC3_DIR}/${id}.log"
+    # default args
+    local args="${id} --profile=${profile}"
 
-  # default args
-  args="${id} --profile=${profile}"
+    # M3: propose LEADER_M3 at 1000 ms, then we'll kill it shortly after
+    if [[ "$id" == "M3" ]]; then
+      args="${args} --propose=LEADER_M3 --trigger-after=1000"
+    fi
 
-  # M3: propose LEADER_M3 at 1000 ms, then we'll kill it shortly after
-  if [[ "$id" == "M3" ]]; then
-    args="${args} --propose=LEADER_M3 --trigger-after=1000"
+    # M4: recovery proposer — propose LEADER_M4 at 3000 ms
+    if [[ "$id" == "M4" ]]; then
+      args="${args} --propose=LEADER_M4 --trigger-after=3000"
+    fi
+
+    nohup mvn -q exec:java \
+      "-Dexec.mainClass=${PROJECT_MAIN}" \
+      "-Dexec.args=${args}" \
+      > "$log" 2>&1 &
+
+    local pid=$!
+    PIDS+=("$pid")
+    PID_MAP["$id"]=$pid
+  done
+
+  echo "Scenario 3c cluster launched. Waiting ${STARTUP_WAIT}s for sockets..."
+  sleep "$STARTUP_WAIT"
+
+  # Let M3 send PREPARE, then crash it.
+  # Kill about 1.6s after its scheduled trigger so it has time to print PREPARE.
+  local KILL_AFTER_MS=1600
+  sleep 1.6
+  echo "Crashing M3 now (after ~${KILL_AFTER_MS}ms past trigger)..."
+  kill_member "M3"
+
+  # Allow time for M4 to drive consensus after M3's crash
+  echo "Allowing ${SCENARIO_TIME}s for recovery consensus..."
+  sleep "$SCENARIO_TIME"
+
+  echo "Cleaning up Scenario 3c processes..."
+  cleanup_all
+  echo "Scenario 3c logs in ${SC3_DIR}"
+}
+
+# ----------------------------
+# Clean logs helper
+# ----------------------------
+clean_logs_only () {
+  echo "Cleaning contents of '${LOG_DIR}/'..."
+  mkdir -p "$LOG_DIR"
+  rm -rf "${LOG_DIR:?}/"* 2>/dev/null || true
+  echo "Done."
+}
+
+# ----------------------------
+# Dispatcher
+# ----------------------------
+main () {
+  if [[ $# -eq 0 ]]; then
+    usage
+    exit 1
   fi
 
-  # M4: recovery proposer — propose LEADER_M4 at 3000 ms
-  if [[ "$id" == "M4" ]]; then
-    args="${args} --propose=LEADER_M4 --trigger-after=3000"
-  fi
+  for arg in "$@"; do
+    case "$arg" in
+      clean)
+        clean_logs_only
+        ;;
+      all)
+        scenario_1
+        scenario_2
+        scenario_3a
+        scenario_3b
+        scenario_3c
+        ;;
+      1|s1|scenario1)
+        scenario_1
+        ;;
+      2|s2|scenario2)
+        scenario_2
+        ;;
+      3a|s3a|scenario3a)
+        scenario_3a
+        ;;
+      3b|s3b|scenario3b)
+        scenario_3b
+        ;;
+      3c|s3c|scenario3c)
+        scenario_3c
+        ;;
+      -h|--help|help)
+        usage
+        ;;
+      *)
+        echo "Unknown argument: '$arg'"
+        usage
+        exit 1
+        ;;
+    esac
+  done
+}
 
-  nohup mvn -q exec:java \
-    "-Dexec.mainClass=${PROJECT_MAIN}" \
-    "-Dexec.args=${args}" \
-    > "$log" 2>&1 &
-
-  pid=$!
-  PIDS+=("$pid")
-  PID_MAP["$id"]=$pid
-done
-
-echo "Scenario 3c cluster launched. Waiting ${STARTUP_WAIT}s for sockets..."
-sleep "$STARTUP_WAIT"
-
-# Let M3 send PREPARE, then crash it.
-# Kill about 1.6s after its scheduled trigger so it has time to print PREPARE.
-KILL_AFTER_MS=1600
-sleep 1.6
-echo "Crashing M3 now (after ~${KILL_AFTER_MS}ms past trigger)..."
-kill_member "M3"
-
-# Allow time for M4 to drive consensus after M3's crash
-echo "Allowing ${SCENARIO_TIME}s for recovery consensus..."
-sleep "$SCENARIO_TIME"
-
-echo "Cleaning up Scenario 3c processes..."
-cleanup_all
-echo "Scenario 3c logs in ${SC3_DIR}"
+main "$@"
